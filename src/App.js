@@ -1,8 +1,8 @@
 import "./App.css";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BookShelf from "./components/BookShelf";
 import SearchPage from "./components/SearchPage";
-import { getAll, update } from "./BooksAPI";
+import { getAll, search as searchBooks, update } from "./BooksAPI";
 
 const SHELF_TITLES = {
   currentlyReading: "Currently Reading",
@@ -12,14 +12,24 @@ const SHELF_TITLES = {
 
 const normalizeBook = (book) => ({
   ...book,
+  authors: (() => {
+    const formattedAuthors = Array.isArray(book.authors)
+      ? book.authors.join(", ")
+      : book.authors;
+
+    return formattedAuthors || "Unknown author";
+  })(),
   cover: book.cover || book.imageLinks?.thumbnail || book.imageLinks?.smallThumbnail,
   dimensions: book.dimensions || { width: 128, height: 193 },
+  shelf: book.shelf || "none",
 });
 
 function App() {
   const [books, setBooks] = useState([]);
   const [showSearchPage, setShowSearchPage] = useState(false);
   const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const previousQueryRef = useRef("");
 
   useEffect(() => {
     let isMounted = true;
@@ -62,6 +72,67 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      setSearchResults([]);
+      previousQueryRef.current = "";
+      return;
+    }
+
+    if (previousQueryRef.current === trimmedQuery) {
+      return;
+    }
+
+    previousQueryRef.current = trimmedQuery;
+
+    let isActive = true;
+
+    searchBooks(trimmedQuery, 20)
+      .then((results) => {
+        if (!isActive) return;
+
+        if (!Array.isArray(results)) {
+          setSearchResults([]);
+          return;
+        }
+
+        const normalizedResults = results.map((result) => {
+          const existingBook = books.find((book) => book.id === result.id);
+
+          if (existingBook) {
+            return normalizeBook({ ...result, shelf: existingBook.shelf });
+          }
+
+          return normalizeBook(result);
+        });
+
+        setSearchResults(normalizedResults);
+      })
+      .catch(() => {
+        if (!isActive) return;
+
+        setSearchResults([]);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [books, query]);
+
+  useEffect(() => {
+    setSearchResults((prevResults) =>
+      prevResults.map((result) => {
+        const existingBook = books.find((book) => book.id === result.id);
+
+        if (!existingBook) return result;
+
+        return { ...result, shelf: existingBook.shelf };
+      })
+    );
+  }, [books]);
+
   const shelves = Object.entries(SHELF_TITLES).map(([key, title]) => ({
     key,
     title,
@@ -73,9 +144,13 @@ function App() {
       {showSearchPage ? (
         <SearchPage
           query={query}
-          results={[]}
+          results={searchResults}
           onQueryChange={setQuery}
-          onClose={() => setShowSearchPage(false)}
+          onClose={() => {
+            setShowSearchPage(false);
+            setQuery("");
+            setSearchResults([]);
+          }}
           onMoveBook={handleMoveBook}
         />
       ) : (
