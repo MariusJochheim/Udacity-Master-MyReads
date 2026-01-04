@@ -2,13 +2,19 @@ import "./App.css";
 import { useEffect, useState } from "react";
 import BookShelf from "./components/BookShelf";
 import SearchPage from "./components/SearchPage";
-import { getAll } from "./BooksAPI";
+import { getAll, update } from "./BooksAPI";
 
 const SHELF_TITLES = {
   currentlyReading: "Currently Reading",
   wantToRead: "Want to Read",
   read: "Read",
 };
+
+const normalizeBook = (book) => ({
+  ...book,
+  cover: book.cover || book.imageLinks?.thumbnail || book.imageLinks?.smallThumbnail,
+  dimensions: book.dimensions || { width: 128, height: 193 },
+});
 
 function App() {
   const [books, setBooks] = useState([]);
@@ -22,11 +28,7 @@ function App() {
       .then((fetchedBooks) => {
         if (!isMounted) return;
 
-        const normalizedBooks = fetchedBooks.map((book) => ({
-          ...book,
-          cover: book.imageLinks?.thumbnail || book.imageLinks?.smallThumbnail,
-          dimensions: { width: 128, height: 193 },
-        }));
+        const normalizedBooks = fetchedBooks.map(normalizeBook);
 
         setBooks(normalizedBooks);
       })
@@ -38,6 +40,27 @@ function App() {
       isMounted = false;
     };
   }, []);
+
+  const handleMoveBook = async (book, newShelf) => {
+    try {
+      await update(book, newShelf);
+
+      setBooks((prevBooks) => {
+        const existingBook = prevBooks.find((prevBook) => prevBook.id === book.id);
+        const normalizedBook = normalizeBook({ ...book, shelf: newShelf });
+
+        if (existingBook) {
+          return prevBooks.map((prevBook) =>
+            prevBook.id === book.id ? { ...prevBook, shelf: newShelf } : prevBook
+          );
+        }
+
+        return [...prevBooks, normalizedBook];
+      });
+    } catch (error) {
+      console.error("Failed to update book shelf", error);
+    }
+  };
 
   const shelves = Object.entries(SHELF_TITLES).map(([key, title]) => ({
     key,
@@ -53,6 +76,7 @@ function App() {
           results={[]}
           onQueryChange={setQuery}
           onClose={() => setShowSearchPage(false)}
+          onMoveBook={handleMoveBook}
         />
       ) : (
         <div className="list-books">
@@ -66,6 +90,7 @@ function App() {
                   key={shelf.key}
                   title={shelf.title}
                   books={shelf.books}
+                  onMoveBook={handleMoveBook}
                 />
               ))}
             </div>
