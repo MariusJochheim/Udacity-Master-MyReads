@@ -1,5 +1,6 @@
 import "./App.css";
 import { useEffect, useRef, useState } from "react";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import BookShelf from "./components/BookShelf";
 import SearchPage from "./components/SearchPage";
 import { getAll, search as searchBooks, update } from "./BooksAPI";
@@ -25,8 +26,9 @@ const normalizeBook = (book) => ({
 });
 
 function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [books, setBooks] = useState([]);
-  const [showSearchPage, setShowSearchPage] = useState(false);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const previousQueryRef = useRef("");
@@ -133,6 +135,19 @@ function App() {
     );
   }, [books]);
 
+  useEffect(() => {
+    if (location.pathname !== "/search") {
+      setQuery("");
+      setSearchResults([]);
+    }
+  }, [location.pathname]);
+
+  const handleCloseSearch = () => {
+    setQuery("");
+    setSearchResults([]);
+    navigate("/");
+  };
+
   const shelves = Object.entries(SHELF_TITLES).map(([key, title]) => ({
     key,
     title,
@@ -141,42 +156,48 @@ function App() {
 
   return (
     <div className="app">
-      {showSearchPage ? (
-        <SearchPage
-          query={query}
-          results={searchResults}
-          onQueryChange={setQuery}
-          onClose={() => {
-            setShowSearchPage(false);
-            setQuery("");
-            setSearchResults([]);
-          }}
-          onMoveBook={handleMoveBook}
+      <Routes>
+        <Route
+          path="/search"
+          element={
+            <SearchPage
+              query={query}
+              results={searchResults}
+              onQueryChange={setQuery}
+              onClose={handleCloseSearch}
+              onMoveBook={handleMoveBook}
+            />
+          }
         />
-      ) : (
-        <div className="list-books">
-          <div className="list-books-title">
-            <h1>MyReads</h1>
-          </div>
-          <div className="list-books-content">
-            <div>
-              {shelves.map((shelf) => (
-                <BookShelf
-                  key={shelf.key}
-                  title={shelf.title}
-                  books={shelf.books}
-                  onMoveBook={handleMoveBook}
-                />
-              ))}
+        <Route
+          path="/"
+          element={
+            <div className="list-books">
+              <div className="list-books-title">
+                <h1>MyReads</h1>
+              </div>
+              <div className="list-books-content">
+                <div>
+                  {shelves.map((shelf) => (
+                    <BookShelf
+                      key={shelf.key}
+                      title={shelf.title}
+                      books={shelf.books}
+                      onMoveBook={handleMoveBook}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="open-search">
+                <Link className="open-search-link" to="/search" aria-label="Add a book">
+                  Add a book
+                </Link>
+              </div>
             </div>
-          </div>
-          <div className="open-search">
-            <button type="button" onClick={() => setShowSearchPage(true)}>
-              Add a book
-            </button>
-          </div>
-        </div>
-      )}
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 }
