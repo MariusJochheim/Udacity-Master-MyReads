@@ -9,12 +9,13 @@ function App() {
       {showSearchPage ? (
         <div className="search-books">
           <div className="search-books-bar">
-            <a
+            <button
+              type="button"
               className="close-search"
               onClick={() => setShowSearchpage(!showSearchPage)}
             >
               Close
-            </a>
+            </button>
             <div className="search-books-input-wrapper">
               <input
                 type="text"
@@ -273,7 +274,12 @@ function App() {
             </div>
           </div>
           <div className="open-search">
-            <a onClick={() => setShowSearchpage(!showSearchPage)}>Add a book</a>
+            <button
+              type="button"
+              onClick={() => setShowSearchpage(!showSearchPage)}
+            >
+              Add a book
+            </button>
           </div>
         </div>
       )}
